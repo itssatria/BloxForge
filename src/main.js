@@ -2,8 +2,8 @@ import './style.css';
 import * as THREE from 'three';
 import { createIcons, icons } from 'lucide';
 import { DEFAULT_AK47_PARTS } from './presets.js';
-import { sanitizeParts, findLoose, fixConnectivity } from './parts.js';
 import { exportGlb } from './exporter.js';
+import { sanitizeParts, findLoose, fixConnectivity } from './parts.js';
 
 const ICONS = icons;
 // =========================================================================
@@ -325,115 +325,118 @@ function handleImageFile(file) {
 // =========================================================================
 // 4. BLENDER PYTHON (BPY) SCRIPT BUILDER FROM STRUCTURED PARTS
 // =========================================================================
-function buildBlenderScriptFromParts(parts, modelName = "Stylized_Model") {
-  const optTarget = document.getElementById("optTarget").value;
-  const styleMode = document.getElementById("styleMode").value;
-  const addOutline = document.getElementById("chkOutline").checked;
-  const addRefPlane = document.getElementById("chkRefPlane").checked;
-  let exportFilename = document.getElementById("exportFilename").value.trim() || "Stylized_Asset_Roblox.glb";
-  if (!exportFilename.toLowerCase().endsWith(".glb") && !exportFilename.toLowerCase().endsWith(".gltf")) {
-    exportFilename += ".glb";
-  }
+    function buildBlenderScriptFromParts(parts, modelName = "Stylized_Model") {
+      const optTarget = document.getElementById("optTarget").value;
+      const styleMode = document.getElementById("styleMode").value;
+      const addOutline = document.getElementById("chkOutline").checked;
+      const addRefPlane = document.getElementById("chkRefPlane").checked;
+      let exportFilename = document.getElementById("exportFilename").value.trim() || "Stylized_Asset_Roblox.glb";
+      if (!exportFilename.toLowerCase().endsWith(".glb") && !exportFilename.toLowerCase().endsWith(".gltf")) {
+        exportFilename += ".glb";
+      }
 
-  // Collect unique hex colors from parts
-  const uniqueHexes = Array.from(new Set(parts.map(p => (p.color || "#189AA7").toUpperCase())));
-  const matVarMap = {};
-  uniqueHexes.forEach((hex, idx) => {
-    matVarMap[hex] = `mat_color_${idx + 1}`;
-  });
+      // Collect unique hex colors from parts
+      const uniqueHexes = Array.from(new Set(parts.map(p => (p.color || "#189AA7").toUpperCase())));
+      const matVarMap = {};
+      uniqueHexes.forEach((hex, idx) => {
+        matVarMap[hex] = `mat_color_${idx + 1}`;
+      });
 
-  const bevelMultiplier = styleMode === "voxel_blocky" ? 0.0 : (styleMode === "smooth_subdiv" ? 1.5 : 1.0);
-  const subdivCode = styleMode === "smooth_subdiv"
-    ? `
-sub = obj.modifiers.new(name="Subsurf", type='SUBSURF')
-sub.levels = 1
-sub.render_levels = 1
-bpy.ops.object.modifier_apply(modifier="Subsurf")`
-    : "";
+      const bevelMultiplier = styleMode === "voxel_blocky" ? 0.0 : (styleMode === "smooth_subdiv" ? 1.5 : 1.0);
+      const subdivCode = styleMode === "smooth_subdiv"
+        ? `
+    sub = obj.modifiers.new(name="Subsurf", type='SUBSURF')
+    sub.levels = 1
+    sub.render_levels = 1
+    bpy.ops.object.modifier_apply(modifier="Subsurf")`
+        : "";
 
-  const materialLines = uniqueHexes.map((hex, i) => {
-    return `${matVarMap[hex]} = make_mat("Palette_Mat_${i + 1}", "${hex}", roughness=0.40)`;
-  }).join("\n");
+      const materialLines = uniqueHexes.map((hex, i) => {
+        return `${matVarMap[hex]} = make_mat("Palette_Mat_${i + 1}", "${hex}", roughness=0.40)`;
+      }).join("\n");
 
-  const partLines = parts.map((p, idx) => {
-    const safeName = (p.name || `Part_${idx}`).replace(/[^a-zA-Z0-9_]/g, "_");
-    const hex = (p.color || "#189AA7").toUpperCase();
-    const matVar = matVarMap[hex] || "mat_color_1";
-    const pos = p.pos || [0, 0, 0];
-    const rot = p.rot || [0, 0, 0];
+      const partLines = parts.map((p, idx) => {
+        const safeName = (p.name || `Part_${idx}`).replace(/[^a-zA-Z0-9_]/g, "_");
+        const hex = (p.color || "#189AA7").toUpperCase();
+        const matVar = matVarMap[hex] || "mat_color_1";
+        const pos = p.pos || [0, 0, 0];
+        const rot = p.rot || [0, 0, 0];
 
-    if (p.type === "cylinder") {
-      const r = p.radius || 0.03;
-      const d = p.depth || 0.2;
-      return `parts.append(add_cyl("${safeName}", ${r.toFixed(4)}, ${d.toFixed(4)}, (${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}), (math.radians(${rot[0]}), math.radians(${rot[1]}), math.radians(${rot[2]})), mat=${matVar}))`;
-    } else {
-      const s = p.size || [0.2, 0.1, 0.1];
-      const bev = ((p.bevel !== undefined ? p.bevel : 0.01) * bevelMultiplier).toFixed(4);
-      return `parts.append(add_part("${safeName}", (${s[0].toFixed(3)}, ${s[1].toFixed(3)}, ${s[2].toFixed(3)}), (${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}), (math.radians(${rot[0]}), math.radians(${rot[1]}), math.radians(${rot[2]})), mat=${matVar}, bevel_width=${bev}))`;
-    }
-  }).join("\n");
+        if (p.type === "polygon") {
+          return `parts.append(add_poly("${safeName}", [${p.pts.map(q => `(${q[0].toFixed(4)}, ${q[1].toFixed(4)})`).join(", ")}], ${p.thick.toFixed(4)}, (${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}), mat=${matVar}))`;
+        }
+        if (p.type === "cylinder") {
+          const r = p.radius || 0.03;
+          const d = p.depth || 0.2;
+          return `parts.append(add_cyl("${safeName}", ${r.toFixed(4)}, ${d.toFixed(4)}, (${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}), (math.radians(${rot[0]}), math.radians(${rot[1]}), math.radians(${rot[2]})), mat=${matVar}))`;
+        } else {
+          const s = p.size || [0.2, 0.1, 0.1];
+          const bev = ((p.bevel !== undefined ? p.bevel : 0.01) * bevelMultiplier).toFixed(4);
+          return `parts.append(add_part("${safeName}", (${s[0].toFixed(3)}, ${s[1].toFixed(3)}, ${s[2].toFixed(3)}), (${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}), (math.radians(${rot[0]}), math.radians(${rot[1]}), math.radians(${rot[2]})), mat=${matVar}, bevel_width=${bev}))`;
+        }
+      }).join("\n");
 
-  const outlineBlock = addOutline ? `
+      const outlineBlock = addOutline ? `
 # Add Stylized Inverted-Hull Cartoon Outline
 mat_outline = make_mat("Cartoon_Outline", "#141821", roughness=0.9)
 mat_outline.use_backface_culling = True
 
 for obj in list(parts):
-outline = obj.copy()
-outline.data = obj.data.copy()
-outline.name = obj.name + "_Outline"
-bpy.context.collection.objects.link(outline)
-outline.data.materials.clear()
-outline.data.materials.append(mat_outline)
-# Flip normals inward for backface-culled silhouette outline
-bpy.context.view_layer.objects.active = outline
-bpy.ops.object.mode_set(mode='EDIT')
-bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.mesh.flip_normals()
-bpy.ops.transform.shrink_fatten(value=-0.006)
-bpy.ops.object.mode_set(mode='OBJECT')
-parts.append(outline)
+    outline = obj.copy()
+    outline.data = obj.data.copy()
+    outline.name = obj.name + "_Outline"
+    bpy.context.collection.objects.link(outline)
+    outline.data.materials.clear()
+    outline.data.materials.append(mat_outline)
+    # Flip normals inward for backface-culled silhouette outline
+    bpy.context.view_layer.objects.active = outline
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.flip_normals()
+    bpy.ops.transform.shrink_fatten(value=-0.006)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    parts.append(outline)
 ` : "";
 
-  const refPlaneBlock = addRefPlane ? `
+      const refPlaneBlock = addRefPlane ? `
 # Optional: Load Reference Image Plane in Viewport (Excluded from GLB export)
 try:
-ref_img = bpy.data.images.load(r"REPLACE_WITH_PATH_TO_YOUR_IMAGE.png")
-ref_empty = bpy.data.objects.new("Reference_Guide", None)
-ref_empty.empty_display_type = 'IMAGE'
-ref_empty.data = ref_img
-ref_empty.empty_display_size = 2.5
-ref_empty.rotation_euler = (math.radians(90), 0, 0)
-bpy.context.collection.objects.link(ref_empty)  # not selected, so excluded from the GLB
+    ref_img = bpy.data.images.load(r"REPLACE_WITH_PATH_TO_YOUR_IMAGE.png")
+    ref_empty = bpy.data.objects.new("Reference_Guide", None)
+    ref_empty.empty_display_type = 'IMAGE'
+    ref_empty.data = ref_img
+    ref_empty.empty_display_size = 2.5
+    ref_empty.rotation_euler = (math.radians(90), 0, 0)
+    bpy.context.collection.objects.link(ref_empty)  # not selected, so excluded from the GLB
 except Exception as e:
-print("Reference image skipped:", e)
+    print("Reference image skipped:", e)
 ` : "";
 
-  const sil = (state.silhouette && document.getElementById("chkSilhouette").checked) ? state.silhouette : null;
-  const silBlock = sil ? `
+      const sil = (state.silhouette && document.getElementById("chkSilhouette").checked) ? state.silhouette : null;
+      const silBlock = sil ? `
 def add_silhouette(name, pts, thick, mat):
-import bmesh
-mesh = bpy.data.meshes.new(name)
-obj = bpy.data.objects.new(name, mesh)
-bpy.context.collection.objects.link(obj)
-bm = bmesh.new()
-face = bm.faces.new([bm.verts.new((x, -thick / 2, z)) for x, z in pts])
-ext = bmesh.ops.extrude_face_region(bm, geom=[face])
-bmesh.ops.translate(bm, vec=(0, thick, 0), verts=[e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)])
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-bm.to_mesh(mesh)
-bm.free()
-obj.data.materials.append(mat)
-return obj
+    import bmesh
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bm = bmesh.new()
+    face = bm.faces.new([bm.verts.new((x, -thick / 2, z)) for x, z in pts])
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, vec=(0, thick, 0), verts=[e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj.data.materials.append(mat)
+    return obj
 
 parts.append(add_silhouette("Silhouette_Body", [${sil.pts.map(p => `(${p[0]}, ${p[1]})`).join(", ")}], ${sil.thick}, make_mat("Silhouette_Body_Mat", "${(state.palette[0] || "#189AA7").toUpperCase()}", roughness=0.45)))
 ` : "";
 
-  const joinBlock = optTarget === "roblox_single" ? `
+      const joinBlock = optTarget === "roblox_single" ? `
 # Join all parts into one single optimized MeshPart for Roblox Studio
 bpy.ops.object.select_all(action='DESELECT')
 for obj in parts:
-obj.select_set(True)
+    obj.select_set(True)
 bpy.context.view_layer.objects.active = parts[0]
 bpy.ops.object.join()
 main_mesh = bpy.context.active_object
@@ -449,13 +452,13 @@ bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
 # Keep parts separate inside a parent collection/selection for Roblox rig/animation
 bpy.ops.object.select_all(action='DESELECT')
 for obj in parts:
-obj.select_set(True)
+    obj.select_set(True)
 bpy.context.view_layer.objects.active = parts[0]
 `;
 
-  const exportFmt = exportFilename.toLowerCase().endsWith(".gltf") ? "GLTF_SEPARATE" : "GLB";
+      const exportFmt = exportFilename.toLowerCase().endsWith(".gltf") ? "GLTF_SEPARATE" : "GLB";
 
-  return `import bpy
+      return `import bpy
 import math
 import os
 
@@ -469,41 +472,58 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # 2. Create Stylized PBR Materials from Reference Palette
 def make_mat(name, hex_color, roughness=0.40):
-mat = bpy.data.materials.new(name=name)
-mat.use_nodes = True
-bsdf = mat.node_tree.nodes.get("Principled BSDF")
-hex_color = hex_color.lstrip('#')
-rgb = tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
-linear = [pow((c + 0.055) / 1.055, 2.4) if c > 0.04045 else c / 12.92 for c in rgb]
-bsdf.inputs["Base Color"].default_value = (*linear, 1.0)
-bsdf.inputs["Roughness"].default_value = roughness
-return mat
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    linear = [pow((c + 0.055) / 1.055, 2.4) if c > 0.04045 else c / 12.92 for c in rgb]
+    bsdf.inputs["Base Color"].default_value = (*linear, 1.0)
+    bsdf.inputs["Roughness"].default_value = roughness
+    return mat
 
 ${materialLines}
 
 # 3. Geometry Builder Helpers
 def add_part(name, size, location, rotation=(0, 0, 0), mat=None, bevel_width=0.01):
-bpy.ops.mesh.primitive_cube_add(size=1.0, location=location, rotation=rotation)
-obj = bpy.context.active_object
-obj.name = name
-obj.scale = size
-bpy.ops.object.transform_apply(scale=True)
-if bevel_width > 0:
-    bev = obj.modifiers.new(name="Bevel", type='BEVEL')
-    bev.width = bevel_width
-    bev.segments = 2
-    bpy.ops.object.modifier_apply(modifier="Bevel")${subdivCode}
-if mat:
-    obj.data.materials.append(mat)
-return obj
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location, rotation=rotation)
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.scale = size
+    bpy.ops.object.transform_apply(scale=True)
+    if bevel_width > 0:
+        bev = obj.modifiers.new(name="Bevel", type='BEVEL')
+        bev.width = bevel_width
+        bev.segments = 2
+        bpy.ops.object.modifier_apply(modifier="Bevel")${subdivCode}
+    if mat:
+        obj.data.materials.append(mat)
+    return obj
 
 def add_cyl(name, radius, depth, location, rotation=(0, 0, 0), mat=None, segs=12):
-bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=radius, depth=depth, location=location, rotation=rotation)
-obj = bpy.context.active_object
-obj.name = name${subdivCode}
-if mat:
-    obj.data.materials.append(mat)
-return obj
+    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=radius, depth=depth, location=location, rotation=rotation)
+    obj = bpy.context.active_object
+    obj.name = name${subdivCode}
+    if mat:
+        obj.data.materials.append(mat)
+    return obj
+
+def add_poly(name, pts, thick, location, mat=None):
+    import bmesh
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bm = bmesh.new()
+    face = bm.faces.new([bm.verts.new((x, -thick / 2, z)) for x, z in pts])
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, vec=(0, thick, 0), verts=[e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj.location = location
+    if mat:
+        obj.data.materials.append(mat)
+    return obj
 
 # 4. Construct 3D Sub-Parts (+X Forward, +Z Up)
 parts = []
@@ -518,15 +538,15 @@ export_dir = desktop if os.path.exists(desktop) else os.path.expanduser("~")
 export_path = os.path.join(export_dir, "${exportFilename}")
 
 bpy.ops.export_scene.gltf(
-filepath=export_path,
-export_format='${exportFmt}',
-use_selection=True,
-export_apply=True
+    filepath=export_path,
+    export_format='${exportFmt}',
+    use_selection=True,
+    export_apply=True
 )
 
 print(f"[BloxForge] Successfully exported 3D model to: {export_path}")
 `;
-}
+    }
 
 // =========================================================================
 // 5. SYNTAX HIGHLIGHTING & CODE DISPLAY
@@ -558,8 +578,10 @@ function updateTriangleEstimate(parts) {
   const addOutline = document.getElementById("chkOutline").checked;
   let tris = 0;
   parts.forEach(p => {
-    if (p.type === "cylinder") {
-      tris += 48;
+    if (p.type === "polygon") {
+          tris += p.pts.length * 4;
+        } else if (p.type === "cylinder") {
+          tris += 48;
     } else {
       tris += styleMode === "voxel_blocky" ? 12 : (styleMode === "smooth_subdiv" ? 280 : 96);
     }
@@ -604,7 +626,8 @@ async function generateWithGeminiVision() {
   const paletteList = state.palette.join(", ");
 
   const systemPrompt = `You are an expert 3D technical artist building stylized low-poly game assets for Roblox/Blender.
-Decompose the subject of the reference image into 12 to 30 primitives ("box" or "cylinder") for a side-profile blockout.
+Decompose the subject of the reference image into 12 to 30 primitives ("box", "cylinder" or "polygon") for a side-profile blockout.
+Use "polygon" for curved, tapered or angled parts (curved magazine, stock, pistol grip, slanted sights): return polygon_2d = 6 to 16 points [x, y] (x left to right, y top to bottom, normalized 0-1000) tracing the part's outline in order, and also box_2d as its bounding box. A curved banana magazine must be ONE polygon that follows its curve and taper, never several boxes.
 For every part return box_2d = [ymin, xmin, ymax, xmax], normalized 0-1000 in the reference image: the tight box of the part measured along its own axes BEFORE tilt, centered where the part sits.
 tilt = in-image rotation of the part in degrees, counter-clockwise positive (0 if none).
 depth = thickness toward/away from the viewer as a fraction of the object's overall length (0.03 to 0.2).
@@ -646,7 +669,8 @@ Return JSON with a short "modelName" (alphanumeric and underscores) and the arra
               type: "OBJECT",
               properties: {
                 name: { type: "STRING" },
-                type: { type: "STRING", enum: ["box", "cylinder"] },
+                type: { type: "STRING", enum: ["box", "cylinder", "polygon"] },
+                polygon_2d: { type: "ARRAY", items: { type: "ARRAY", items: { type: "NUMBER" } } },
                 box_2d: { type: "ARRAY", items: { type: "NUMBER" } },
                 tilt: { type: "NUMBER" },
                 depth: { type: "NUMBER" },
@@ -757,6 +781,18 @@ function convert2D(raw) {
     const w = (x1 - x0) * s, h = (y1 - y0) * s, tilt = +p.tilt || 0;
     const dep = Math.min(0.3, Math.max(0.03, +p.depth || 0.08)) * 2.0;
     const o = { name: p.name, type: p.type, color: p.color, pos: [((x0 + x1) / 2 - ucx) * s, 0, -((y0 + y1) / 2 - ucy) * s] };
+    if (p.type === "polygon") {
+      const q = (Array.isArray(p.polygon_2d) ? p.polygon_2d : []).filter(a => Array.isArray(a) && Number.isFinite(+a[0]) && Number.isFinite(+a[1])).map(a => [+a[0] / 1000 * W, +a[1] / 1000 * H]);
+      if (q.length >= 3) {
+        const cx = (Math.min(...q.map(a => a[0])) + Math.max(...q.map(a => a[0]))) / 2;
+        const cy = (Math.min(...q.map(a => a[1])) + Math.max(...q.map(a => a[1]))) / 2;
+        o.pos = [(cx - ucx) * s, 0, -(cy - ucy) * s];
+        o.pts = q.map(([a, b]) => [(a - cx) * s, -(b - cy) * s]);
+        o.thick = dep; o.rot = [0, 0, 0];
+        return o;
+      }
+      o.type = "box";
+    }
     if (p.type === "cylinder") {
       if (w >= h) { o.radius = h / 2; o.depth = w; o.rot = [0, 90 - tilt, 0]; }
       else { o.radius = w / 2; o.depth = h; o.rot = [0, -tilt, 0]; }
@@ -993,7 +1029,10 @@ function rebuildPartsOnly(parts) {
     const ry = THREE.MathUtils.degToRad(p.rot?.[1] || 0);
     const rz = THREE.MathUtils.degToRad(p.rot?.[2] || 0);
 
-    if (p.type === "cylinder") {
+    if (p.type === "polygon") {
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(p.pts.map(([x, z]) => new THREE.Vector2(x, z))), { depth: p.thick, bevelEnabled: false });
+      geom.translate(0, 0, -p.thick / 2);
+    } else if (p.type === "cylinder") {
       const r = p.radius || 0.03;
       const d = p.depth || 0.2;
       geom = new THREE.CylinderGeometry(r, r, d, 14);
@@ -1192,8 +1231,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Load AK-47 Preset Button
- 
-
   // Live Reactive Settings Updates (immediately updates script & 3D preview)
   ["optTarget", "styleMode", "chkOutline", "chkRefPlane", "chkSilhouette", "exportFilename"].forEach(id => {
     document.getElementById(id).addEventListener("change", () => {
@@ -1230,10 +1267,12 @@ window.addEventListener("DOMContentLoaded", () => {
     tabCode.className = "px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white flex items-center gap-1.5 transition";
     previewPane.classList.remove("hidden");
     codePane.classList.add("hidden");
-    
     onThreeResize();
   });
-requestAnimationFrame(() => tabPreview.click());
+
+  // Start on the 3D preview instead of the code tab
+  requestAnimationFrame(() => tabPreview.click());
+
   // 3D Viewport Controls
   document.getElementById("btnToggleWireframe").addEventListener("click", () => {
     state.wireframeMode = !state.wireframeMode;

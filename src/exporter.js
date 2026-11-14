@@ -22,9 +22,15 @@ function partMatrix(p) {
 
 function collectItems(parts, silhouette, silColor) {
   const items = parts.map((p, i) => {
-    const geom = p.type === 'cylinder'
-      ? new THREE.CylinderGeometry(p.radius || 0.03, p.radius || 0.03, p.depth || 0.2, 14)
-      : new THREE.BoxGeometry(p.size?.[0] || 0.2, p.size?.[2] || 0.1, p.size?.[1] || 0.1);
+    let geom;
+    if (p.type === 'polygon') {
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(p.pts.map(([x, z]) => new THREE.Vector2(x, z))), { depth: p.thick, bevelEnabled: false });
+      geom.translate(0, 0, -p.thick / 2);
+    } else if (p.type === 'cylinder') {
+      geom = new THREE.CylinderGeometry(p.radius || 0.03, p.radius || 0.03, p.depth || 0.2, 14);
+    } else {
+      geom = new THREE.BoxGeometry(p.size?.[0] || 0.2, p.size?.[2] || 0.1, p.size?.[1] || 0.1);
+    }
     return { geom, matrix: partMatrix(p), color: (p.color || '#189AA7').toUpperCase(), name: p.name || `Part_${i}` };
   });
   if (silhouette && silhouette.pts?.length > 2) {

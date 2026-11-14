@@ -34,12 +34,26 @@ Drop in a picture of an object, a prop or a weapon. The app returns:
 
 | Step | What happens |
 | --- | --- |
-| **1. Read** | Gemini Vision labels the reference image as a list of 2D boxes: name, rectangle, color, and whether the part is round or boxy. |
-| **2. Unflatten** | Boxes are mapped onto a projection plane and given real depth, so a flat drawing becomes a solid blockout instead of a picture standing upright. |
+| **1. Read** | Gemini Vision labels the reference image as a list of parts: a name, a rectangle, a color, and whether the shape is a box, a cylinder, or a traced outline. |
+| **2. Unflatten** | Every part is mapped onto a projection plane and given real depth. A traced outline is kept as a polygon and extruded, so a curved part becomes a curved solid instead of a picture standing upright. |
 | **3. Weld** | Loose parts are detected as disconnected components and rigidly snapped onto the main body, so nothing floats off the model. |
 | **4. Build** | The image silhouette is extruded into a body shell, the part list is written into a `bpy` script, and the same part list feeds the Three.js preview and the GLB exporter. |
 
 Everything after the vision call is deterministic, so an imperfect read still produces a script you can hand-edit.
+
+## Part types
+
+A model is a flat list of three primitives. Positions are in model units on the side profile (X forward, Y across, Z up).
+
+| Type | Fields | Use it for |
+| --- | --- | --- |
+| `box` | `size: [x, y, z]`, `bevel` | Slabs, receivers, rails, most hard-edged parts. |
+| `cylinder` | `radius`, `depth`, `rot` | Barrels, tubes, pins, anything round in profile. |
+| `polygon` | `pts: [[x, z], …]` (3 or more), `thick` | Curved, tapered or angled outlines: a banana magazine, a pistol grip, a stock. |
+
+A `polygon` follows the outline you give it and extrudes that outline into a solid, the same trick the silhouette body uses for the whole object. `pts` is traced in order around the shape on the X/Z plane and `thick` is the depth along Y. Gemini returns `polygon_2d` in 0–1000 image space with 6–16 points; the app converts it to points and thickness for you.
+
+Polygons are first-class everywhere downstream: the preview and GLB export build them with `ExtrudeGeometry`, the generated script builds them with `add_poly()` in `bmesh`, and loose-part detection measures them by their outline bounds. A polygon with fewer than three valid points silently falls back to a box, so a malformed read can never break the build.
 
 ## Features
 
@@ -49,6 +63,7 @@ Everything after the vision call is deterministic, so an imperfect read still pr
 - Optional part hints ("curved magazine, orange muzzle tip") to steer the read.
 
 **Geometry**
+- Three primitives: `box`, `cylinder`, and `polygon` outlines extruded into solids.
 - Sanitized part specs: bad numbers, colors or sizes can't break the script or the preview.
 - Loose-part detection and auto-snap onto the main body.
 - Silhouette body extrusion for shapes primitives alone can't describe.
@@ -117,7 +132,7 @@ Any static host works the same way: build command `npm run build`, output direct
 
 ## Blender output
 
-The generated script is plain `bpy`: it resets the scene, builds Principled BSDF materials from the extracted palette, creates one object per part with bevel modifiers, and optionally adds an inverted-hull outline and the reference image plane. You can read it top to bottom before running it.
+The generated script is plain `bpy`: it resets the scene, builds Principled BSDF materials from the extracted palette, creates one object per part (boxes and cylinders with bevel modifiers, polygons via `add_poly()` in `bmesh`), and optionally adds an inverted-hull outline and the reference image plane. You can read it top to bottom before running it.
 
 <p align="center">
   <img src="docs/code-panel.png" width="900" alt="Generated Blender Python script inside BloxForge">
@@ -126,5 +141,5 @@ The generated script is plain `bpy`: it resets the scene, builds Principled BSDF
 ## Notes
 
 - The vision read is a suggestion, not a measurement; treat the first generation as a blockout.
-- Complex organic shapes are out of scope by design. Props, weapons, tools and stylized objects are the sweet spot.
+- Hard-surface props, weapons, tools and stylized objects are the sweet spot. Polygon outlines cover the curved cases (magazines, grips, stocks); fully organic shapes are still out of scope by design.
 - No license file yet: add one before reusing this code in your own project.
