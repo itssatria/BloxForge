@@ -112,11 +112,24 @@
         </div>
       </div>
 
-      <!-- 2. Blender & Roblox Build Configuration -->
+      <!-- 2. Primary Generate Action -->
+      <div class="bg-studio-panel border border-studio-blender/25 rounded-xl p-4 shadow-sm flex flex-col gap-2.5">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="wand-2" class="w-4 h-4 text-studio-blender"></i>
+          2. Generate Asset
+        </h2>
+        <button id="btnGenerate" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-studio-blender to-orange-600 hover:from-studio-blenderHover hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-studio-blender/25 transition flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="wand-2" class="w-4 h-4"></i>
+          <span id="btnGenerateText">Generate Blender Python Script</span>
+        </button>
+        <p class="text-[11px] text-slate-500 leading-relaxed">Reads the reference image with Gemini, rebuilds the parts, and writes the <code class="text-studio-roblox">bpy</code> script. Tune the result in Advanced Settings below.</p>
+      </div>
+
+      <!-- 3. Advanced Settings (Optional) -->
       <div class="bg-studio-panel border border-studio-border rounded-xl p-4 shadow-sm flex flex-col gap-4">
         <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
           <i data-lucide="sliders" class="w-4 h-4 text-studio-roblox"></i>
-          2. 3D Generation & Roblox Settings
+          3. Advanced Settings
         </h2>
 
         <!-- Target Optimization -->
@@ -176,11 +189,6 @@
   <i data-lucide="download" class="w-4 h-4 text-studio-roblox"></i>
   Export GLB
 </button>
-        <!-- Primary Generate CTA Button -->
-        <button id="btnGenerate" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-studio-blender to-orange-600 hover:from-studio-blenderHover hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-studio-blender/25 transition flex items-center justify-center gap-2 cursor-pointer">
-          <i data-lucide="wand-2" class="w-4 h-4"></i>
-          <span id="btnGenerateText">Generate Blender Python Script</span>
-        </button>
       </div>
     </section>
 
