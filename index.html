@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BloxForge — Stylized 3D Asset Builder for Roblox</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%A7%8A%3C/text%3E%3C/svg%3E" />
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body class="min-h-screen flex flex-col overflow-x-hidden selection:bg-studio-blender/30 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-studio-panel border-b border-studio-border px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <img src="/logo.png" alt="BloxForge" width="600" height="177"
+     class="h-7 sm:h-9 w-auto max-w-[45vw] object-contain" />
+      <div>
+        <div class="flex items-center gap-2">
+          
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-studio-roblox/15 text-studio-roblox border border-studio-roblox/30">
+            Roblox GLB Ready
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 hidden sm:block">AI Reference Image to Stylized Blender Python (<code class="text-studio-blender">bpy</code>) Generator</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="flex items-center bg-studio-bg border border-studio-border rounded-lg overflow-hidden focus-within:border-studio-blender">
+        <i data-lucide="key" class="w-3.5 h-3.5 text-studio-blender ml-2.5"></i>
+        <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Gemini API key" class="w-28 sm:w-44 bg-transparent px-2 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none" />
+        <button id="btnToggleKey" type="button" title="Show / hide key" class="px-2 text-[11px] text-slate-400 hover:text-white border-l border-studio-border h-full">Show</button>
+      </div>
+      
+      
+      <button id="btnHelpModal" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-studio-surface hover:bg-studio-border text-slate-200 border border-studio-border transition flex items-center gap-1.5">
+        <i data-lucide="help-circle" class="w-3.5 h-3.5 text-studio-roblox"></i>
+        <span>How to Run in Blender</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Toast / Status Notification Banner -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 hidden transform transition-all duration-300">
+    <div class="bg-studio-panel border border-studio-border shadow-2xl rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-white">
+      <span id="toastIcon" class="text-studio-blender"></span>
+      <span id="toastText">Notification</span>
+    </div>
+  </div>
+
+  <!-- Main Workspace Split-Pane -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0">
+
+    <!-- LEFT PANE: Reference Image, Palette & Build Settings -->
+    <section class="lg:col-span-5 xl:col-span-4 bg-studio-panel/60 border-b lg:border-b-0 lg:border-r border-studio-border p-4 sm:p-5 flex flex-col gap-5 overflow-y-auto lg:max-h-[calc(100vh-61px)]">
+
+      <!-- 1. Image Upload & Canvas Inspector -->
+      <div class="bg-studio-panel border border-studio-border rounded-xl p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="image" class="w-4 h-4 text-studio-blender"></i>
+            1. Reference Image
+          </h2>
+          <div class="flex items-center gap-1.5">
+            <button id="btnToggleGrid" title="Toggle 3D Proportion Grid" class="p-1.5 rounded-lg bg-studio-surface hover:bg-studio-border text-slate-300 border border-studio-border transition text-xs flex items-center gap-1">
+              <i data-lucide="grid" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Grid</span>
+            </button>
+            <button id="btnEyedropper" title="Sample Color from Image" class="p-1.5 rounded-lg bg-studio-surface hover:bg-studio-border text-slate-300 border border-studio-border transition text-xs flex items-center gap-1">
+              <i data-lucide="pipette" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Sample</span>
+            </button>
+            <label for="fileInput" class="cursor-pointer px-2.5 py-1.5 rounded-lg bg-studio-surface hover:bg-studio-border text-slate-200 border border-studio-border transition text-xs font-medium flex items-center gap-1">
+              <i data-lucide="upload" class="w-3.5 h-3.5 text-studio-roblox"></i>
+              Upload
+            </label>
+            <input id="fileInput" type="file" accept="image/png, image/jpeg, image/webp" class="hidden" />
+          </div>
+        </div>
+
+        <!-- Dropzone & Canvas Container -->
+        <div id="dropZone" class="relative w-full aspect-[16/10] bg-[#131519] rounded-lg border-2 border-dashed border-studio-border hover:border-studio-blender/70 transition overflow-hidden flex items-center justify-center group">
+          <canvas id="refCanvas" class="w-full h-full object-contain block"></canvas>
+
+          <!-- Empty State Overlay -->
+          <div id="emptyDropHint" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center pointer-events-none hidden">
+            <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-500 mb-2"></i>
+            <p class="text-xs font-medium text-slate-300">Drop reference image here or click Upload</p>
+            <p class="text-[11px] text-slate-500 mt-1">Supports PNG, JPG, WEBP</p>
+          </div>
+
+          <!-- Sampled Color Floating Pill -->
+          <div id="eyedropperReadout" class="hidden absolute bottom-2 left-2 bg-studio-bg/90 backdrop-blur border border-studio-border px-2.5 py-1 rounded-md text-[11px] font-mono flex items-center gap-2 shadow-lg">
+            <span id="sampledSwatch" class="w-3 h-3 rounded-sm border border-white/20 inline-block"></span>
+            <span id="sampledHex">#FFFFFF</span>
+            <span class="text-slate-400">(Click to add)</span>
+          </div>
+        </div>
+
+        <!-- Extracted Dominant Palette -->
+        <div class="mt-3.5">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-medium text-slate-400">Extracted Palette (Click swatch to copy hex)</span>
+            <button id="btnReExtract" class="text-[11px] text-studio-roblox hover:underline">Re-scan Colors</button>
+          </div>
+          <div id="paletteContainer" class="grid grid-cols-6 gap-2">
+            <!-- Swatches injected via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Blender & Roblox Build Configuration -->
+      <div class="bg-studio-panel border border-studio-border rounded-xl p-4 shadow-sm flex flex-col gap-4">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="sliders" class="w-4 h-4 text-studio-roblox"></i>
+          2. 3D Generation & Roblox Settings
+        </h2>
+
+        <!-- Target Optimization -->
+        <div>
+          <label for="optTarget" class="block text-xs font-medium text-slate-300 mb-1.5">Target Platform Optimization</label>
+          <select id="optTarget" class="w-full bg-studio-bg border border-studio-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-studio-blender">
+            <option value="roblox_single">Roblox Studio (&lt; 10k tris, Single MeshPart, GLB)</option>
+            <option value="roblox_rigged">Roblox Animated Weapon (Separate MeshParts in Model, GLB)</option>
+            <option value="general_gltf">General Game Asset (Clean Topology, GLTF/GLB)</option>
+          </select>
+        </div>
+
+        <!-- Style Mode -->
+        <div>
+          <label for="styleMode" class="block text-xs font-medium text-slate-300 mb-1.5">3D Modeling Style</label>
+          <select id="styleMode" class="w-full bg-studio-bg border border-studio-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-studio-blender">
+            <option value="stylized_bevel">Stylized Beveled Low-Poly (Crisp Cartoon Edges)</option>
+            <option value="voxel_blocky">Blocky / Voxel-Inspired (Clean Hard Edges)</option>
+            <option value="smooth_subdiv">Smooth Subdivided (Rounded Organic Forms)</option>
+          </select>
+        </div>
+
+        <!-- Optional Guidance Prompt -->
+        <div>
+          <label for="customNotes" class="block text-xs font-medium text-slate-300 mb-1.5">Extra Part Hints <span class="text-slate-500">(Optional)</span></label>
+          <input id="customNotes" type="text" placeholder="e.g. Curved magazine, orange muzzle tip, separate trigger..." class="w-full bg-studio-bg border border-studio-border rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-studio-blender" />
+        </div>
+
+        <!-- Toggles -->
+        <div class="space-y-2.5 pt-1 border-t border-studio-border/60">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs text-slate-300">Add Inverted-Hull Cartoon Outline</span>
+            <input id="chkOutline" type="checkbox" class="w-4 h-4 accent-studio-blender rounded cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs text-slate-300">Include Reference Image Plane in Blender</span>
+            <input id="chkRefPlane" type="checkbox" class="w-4 h-4 accent-studio-blender rounded cursor-pointer" />
+          </label>
+        </div>
+
+        <div class="space-y-2.5 pt-1 border-t border-studio-border/60">
+          <label class="flex items-center justify-between cursor-pointer"><span class="text-xs text-slate-300">Auto-snap loose parts together</span><input id="chkAutoFix" type="checkbox" checked class="w-4 h-4 accent-studio-blender rounded cursor-pointer" /></label>
+          <label class="flex items-center justify-between cursor-pointer"><span class="text-xs text-slate-300">Silhouette body (extruded from image)</span><input id="chkSilhouette" type="checkbox" checked class="w-4 h-4 accent-studio-blender rounded cursor-pointer" /></label>
+          <label class="flex items-center justify-between cursor-pointer"><span class="text-xs text-slate-300">Self-correct with render (extra API call)</span><input id="chkRefine" type="checkbox" class="w-4 h-4 accent-studio-blender rounded cursor-pointer" /></label>
+        </div>
+
+        <!-- Export Filename -->
+        <div>
+          <label for="exportFilename" class="block text-xs font-medium text-slate-300 mb-1.5">Export GLB Filename</label>
+          <div class="flex items-center bg-studio-bg border border-studio-border rounded-lg overflow-hidden focus-within:border-studio-blender">
+            <input id="exportFilename" type="text" value="Stylized_AK47_Roblox.glb" class="w-full bg-transparent px-3 py-2 text-xs font-mono text-white focus:outline-none" />
+           
+          </div>
+        </div>
+<!-- Export GLB -->
+<button data-export-glb class="w-full py-2.5 px-4 rounded-xl border border-studio-roblox/50 bg-studio-roblox/10 hover:bg-studio-roblox/20 text-white font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer">
+  <i data-lucide="download" class="w-4 h-4 text-studio-roblox"></i>
+  Export GLB
+</button>
+        <!-- Primary Generate CTA Button -->
+        <button id="btnGenerate" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-studio-blender to-orange-600 hover:from-studio-blenderHover hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-studio-blender/25 transition flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="wand-2" class="w-4 h-4"></i>
+          <span id="btnGenerateText">Generate Blender Python Script</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANE: Code Editor & Interactive 3D Blockout Preview -->
+    <section class="lg:col-span-7 xl:col-span-8 bg-studio-bg flex flex-col lg:max-h-[calc(100vh-61px)]">
+
+      <!-- Toolbar & Tabs -->
+      <div class="bg-studio-panel border-b border-studio-border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <!-- View Switcher Tabs -->
+        <div class="flex items-center bg-studio-bg p-1 rounded-lg border border-studio-border">
+                    <button id="tabPreview" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+            <i data-lucide="cuboid" class="w-3.5 h-3.5 text-studio-roblox"></i>
+            3D Blockout Preview
+          </button>
+          <button id="tabCode" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-studio-surface text-white shadow-sm flex items-center gap-1.5 transition">
+            <i data-lucide="file-code-2" class="w-3.5 h-3.5 text-studio-blender"></i>
+            Blender Python (<code class="text-studio-blender">bpy</code>)
+          </button>
+
+        </div>
+
+        <!-- Stats & Export Action Buttons -->
+        <div class="flex items-center gap-2">
+          <span id="triEstimateBadge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-mono">
+            <i data-lucide="triangle" class="w-3 h-3"></i>
+            <span id="triCountText">~2,840 tris</span>
+          </span>
+
+          <button id="btnCopyCode" class="px-3 py-1.5 rounded-lg bg-studio-surface hover:bg-studio-border text-slate-200 border border-studio-border text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copy Script</span>
+          </button>
+
+          <button id="btnDownloadPy" class="px-3 py-1.5 rounded-lg bg-studio-roblox hover:bg-studio-robloxHover text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Download .py</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading Overlay during Gemini Vision Analysis -->
+      <div id="aiLoadingBar" class="hidden bg-studio-blender/15 border-b border-studio-blender/30 px-4 py-2.5 flex items-center justify-between text-xs text-orange-200">
+        <div class="flex items-center gap-2.5">
+          <svg class="animate-spin h-4 w-4 text-studio-blender" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span id="aiLoadingStatus">Analyzing image silhouette, sub-parts, and color regions with Gemini Vision...</span>
+        </div>
+        <span class="font-mono text-[11px] text-studio-blender">gemini-3-flash-preview</span>
+      </div>
+
+      <!-- TAB 1: Syntax-Highlighted Blender Python Code Viewer -->
+      <div id="codePane" class="flex-1 overflow-auto relative font-mono text-xs leading-relaxed">
+        <div class="flex min-h-full">
+          <!-- Line Numbers Gutter -->
+          <div id="lineNumbers" class="select-none bg-[#14161A] text-slate-600 text-right py-4 px-3 border-r border-studio-border/60">
+            1
+          </div>
+          <!-- Highlighted Code Pre -->
+          <pre class="flex-1 py-4 px-4 text-slate-200 overflow-x-auto"><code id="codeOutput"></code></pre>
+        </div>
+      </div>
+
+      <!-- TAB 2: Interactive 3D Three.js Blockout Preview -->
+      <div id="previewPane" class="hidden flex-1 relative bg-[#121418] overflow-hidden flex flex-col">
+        <div id="threeContainer" class="w-full h-full flex-1 cursor-grab active:cursor-grabbing"></div>
+
+        <!-- 3D Viewport HUD Overlay -->
+        <div class="absolute top-3 left-3 bg-studio-panel/85 backdrop-blur border border-studio-border rounded-lg p-2.5 text-[11px] text-slate-300 space-y-1 pointer-events-none">
+          <div class="font-semibold text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Live 3D Blockout Approximation
+          </div>
+          <p class="text-slate-400">Drag to orbit • Scroll to zoom • Right-drag to pan</p>
+          <p id="previewPartsCount" class="font-mono text-studio-roblox">Parts: 20 primitives</p>
+        </div>
+
+        <div class="absolute bottom-3 right-3 flex items-center gap-2">
+          <button id="btnSideView" class="px-3 py-1.5 rounded-lg bg-studio-panel/90 hover:bg-studio-surface border border-studio-border text-xs text-slate-200 flex items-center gap-1.5 shadow-lg">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-studio-roblox"></i>
+            Side View + Ref
+          </button>
+          <button id="btnToggleWireframe" class="px-3 py-1.5 rounded-lg bg-studio-panel/90 hover:bg-studio-surface border border-studio-border text-xs text-slate-200 flex items-center gap-1.5 shadow-lg">
+            <i data-lucide="boxes" class="w-3.5 h-3.5 text-studio-blender"></i>
+            Toggle Wireframe
+          </button>
+          <button id="btnResetCam" class="px-3 py-1.5 rounded-lg bg-studio-panel/90 hover:bg-studio-surface border border-studio-border text-xs text-slate-200 flex items-center gap-1.5 shadow-lg">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-studio-roblox"></i>
+            Reset View
+          </button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Modal: How to Run in Blender -->
+  <div id="helpModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-studio-panel border border-studio-border rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-studio-border">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="terminal" class="w-5 h-5 text-studio-blender"></i>
+          How to Generate Your .GLB in Blender
+        </h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <ol class="mt-4 space-y-3 text-xs sm:text-sm text-slate-300 list-decimal list-inside">
+        <li>Click <strong class="text-white">Copy Script</strong> or <strong class="text-white">Download .py</strong> in this studio.</li>
+        <li>Open <strong class="text-white">Blender</strong> (version 3.6 or 4.x).</li>
+        <li>Click the <strong class="text-studio-blender">Scripting</strong> workspace tab in the top menu bar.</li>
+        <li>Click <strong class="text-white">+ New</strong> (or <strong class="text-white">Open</strong> if you downloaded the <code class="text-studio-roblox">.py</code> file).</li>
+        <li>Paste the Python script and click the <strong class="text-emerald-400">Run Script (▶)</strong> button.</li>
+        <li>Your optimized <code class="text-studio-blender">.glb</code> model will appear in the viewport and automatically export to your <strong class="text-white">Desktop</strong>!</li>
+        <li>In <strong class="text-studio-roblox">Roblox Studio</strong>, open <em>Asset Manager &rarr; Bulk Import</em> (or <em>Avatar / 3D Importer</em>) and select the exported <code class="text-studio-blender">.glb</code> file.</li>
+      </ol>
+      <div class="mt-6 flex justify-end">
+        <button id="btnGotIt" class="px-4 py-2 rounded-lg bg-studio-blender hover:bg-studio-blenderHover text-white text-xs font-semibold">
+          Got It
+        </button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
